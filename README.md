@@ -39,6 +39,7 @@
 | --- | --- |
 | `🌐 全部节点` | 全部可用节点 |
 | `🏳️ 其他地区` | 未匹配到国家的节点 |
+| `🤖 AI` | AI 专用入口，成员为各地区组、其他地区、关闭旁路、全部节点和 `DIRECT` |
 | `♻️ 其他地区自动` / `📌 其他地区优先` | 其他地区的自动/优先组（创建时隐藏） |
 | `♻️ 自动选择` | 复用或新建的全局自动组 |
 | `🚀 节点选择` | 订阅没有可复用入口组时的主入口 |
@@ -86,6 +87,7 @@ var SKIP = /剩余流量|套餐|到期|重置|订阅|超时请|官网|客服/;
 ```js
 var MY_RULES = [
   'DOMAIN-SUFFIX,cn.bing.com,DIRECT',
+  'GEOSITE,category-ai-!cn,🤖 AI',
   // 'DOMAIN-SUFFIX,example.com,DIRECT',
   // 'DOMAIN-SUFFIX,openai.com,🇺🇸 美国',
 ];
@@ -95,6 +97,34 @@ var MY_RULES = [
 - 目标可写 `DIRECT`、`REJECT`、节点全名或代理组名。
 - 引用节点全名时，机场改名后会失效，优先引用分组名。
 - 需要解析 IP 的规则可加 `,no-resolve` 避免触发 DNS 解析，例如 `IP-CIDR,192.168.50.0/24,DIRECT,no-resolve`。
+
+### Antigravity 与 AI 接口
+
+脚本已把 Antigravity / Gemini 的专用接口显式指向 `🤖 AI`：
+
+```text
+antigravity.googleapis.com
+antigravity-pa.googleapis.com
+antigravity.google / antigravity.goog
+antigravity-unleash.goog
+generativelanguage.googleapis.com
+cloudcode-pa.googleapis.com
+daily-cloudcode-pa.googleapis.com
+aicode.googleapis.com
+aiplatform.googleapis.com
+us-central1-aiplatform.googleapis.com（区域端点）
+autopush-aicode.sandbox.googleapis.com（灰度通道）
+businessaicode.googleapis.com
+alkalimakersuiteapplets.pa.googleapis.com
+```
+
+`fonts.googleapis.com`、`www.gstatic.com`、`lh3.googleusercontent.com`、`oauth2.googleapis.com`、`www.googleapis.com`、`play.googleapis.com` 属于 Google 公共域名，其他应用也在用，因此不单独指向 `🤖 AI`；它们不需要按 AI 使用地区选择出口。
+
+另加了两条进程级兜底：`PROCESS-NAME,Antigravity.exe` 和 `PROCESS-NAME,language_server.exe`。这样 Antigravity 的登录、字体、资源、更新以及以后版本新增的域名都会统一走 `🤖 AI`，不需要每次升级补规则。生效前提是 FlClash 的 `find-process-mode` 不为 `off`；副作用是 Antigravity 的全部流量都会使用 AI 出口。若本机其他软件也带同名的 `language_server.exe`，应改用 `PROCESS-PATH` 精确匹配。
+
+`🤖 AI` 组里有一个 `⏸️ 关闭（跟随 雪山·Link）` 成员，作为运行时开关。它是一个隐藏的透传组，唯一成员是主入口，因此不会在顶部多出一个分组标签。选中它后，AI 规则仍然存在，但 `🤖 AI` 会直接跟随主入口（当前是 `雪山·Link`）的节点选择；再选回任意地区即可恢复 AI 独立出口。主入口改名时，这个成员的标签会自动跟着变。
+
+香港不是 Gemini API 的支持地区，`🤖 AI` 里请选台湾、日本、新加坡或美国。规则只影响新连接，切换后需要重启 Antigravity。
 
 ### 地区组规则
 

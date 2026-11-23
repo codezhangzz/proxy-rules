@@ -18,6 +18,8 @@
 function main(config) {
   var TEST_URL = 'https://www.gstatic.com/generate_204';
   var INTERVAL = 180;
+  // AI 独立出口组名；规则和分组都引用这个常量，改名时只需改这里。
+  var AI = '🤖 AI';
 
   // 想指定每个国家优先用哪些节点：数组顺序就是优先级，没写到的排在后面。
   // key 用国家简称（与分组名去掉国旗后一致），例如：
@@ -93,6 +95,39 @@ function main(config) {
   var MY_RULES = [
     // —— 当前在用的 ——
     'DOMAIN-SUFFIX,cn.bing.com,DIRECT',
+
+    // —— AI 单独出口：命中后走下面创建的「🤖 AI」组 ——
+    // Antigravity / Gemini 专用接口：显式写死，避免 geosite 版本差异导致漏命中。
+    'DOMAIN-SUFFIX,antigravity.googleapis.com,' + AI,
+    'DOMAIN-SUFFIX,antigravity-pa.googleapis.com,' + AI,
+    'DOMAIN-SUFFIX,antigravity.google,' + AI,
+    'DOMAIN-SUFFIX,antigravity.google.com,' + AI,
+    'DOMAIN-SUFFIX,antigravity.goog,' + AI,
+    'DOMAIN-SUFFIX,antigravity-unleash.goog,' + AI,
+    'DOMAIN-SUFFIX,generativelanguage.googleapis.com,' + AI,
+    'DOMAIN-SUFFIX,cloudcode-pa.googleapis.com,' + AI,
+    'DOMAIN-SUFFIX,daily-cloudcode-pa.googleapis.com,' + AI,
+    'DOMAIN-SUFFIX,aicode.googleapis.com,' + AI,
+    'DOMAIN-SUFFIX,aiplatform.googleapis.com,' + AI,
+    // Vertex AI 区域端点形如 us-central1-aiplatform.googleapis.com，
+    // 不匹配上面的 DOMAIN-SUFFIX，需要按关键字补一条。
+    'DOMAIN-KEYWORD,-aiplatform.googleapis.com,' + AI,
+    // 预览/灰度通道的沙箱端点（autopush-*、preprod-*）。
+    'DOMAIN-SUFFIX,aicode.sandbox.googleapis.com,' + AI,
+    'DOMAIN-SUFFIX,cloudcode-pa.sandbox.googleapis.com,' + AI,
+    'DOMAIN-SUFFIX,daily-cloudcode-pa.sandbox.googleapis.com,' + AI,
+    // 企业版 / AI Studio 附带接口。
+    'DOMAIN-SUFFIX,businessaicode.googleapis.com,' + AI,
+    'DOMAIN-SUFFIX,alkalimakersuiteapplets.pa.googleapis.com,' + AI,
+    // 更新器按关键字匹配，项目号变化时不用改规则。
+    'DOMAIN-KEYWORD,antigravity-hub-auto-updater,' + AI,
+    'DOMAIN-KEYWORD,antigravity-ide-auto-updater,' + AI,
+    'GEOSITE,category-ai-!cn,' + AI,
+    // 进程级兜底：Antigravity 的其余连接（字体、登录、资源、以后新增的域名）
+    // 也统一走 AI 组，避免版本升级后漏配。依赖 FlClash 开启进程匹配。
+    // 注意 language_server.exe 名称较通用；若本机其他软件也用同名进程，改用 PROCESS-PATH。
+    'PROCESS-NAME,Antigravity.exe,' + AI,
+    'PROCESS-NAME,language_server.exe,' + AI,
 
     // —— 直连 ——
     // 'DOMAIN-SUFFIX,example.com,DIRECT',
@@ -287,6 +322,31 @@ function main(config) {
 
   var mainGroup = { name: mainName, type: 'select', proxies: mainMembers };
 
+  // 「关闭」旁路做成隐藏的 select 组，唯一成员是主入口。
+  // 这样 AI 组可以引用一个有名字的实体，而不是引用不存在的标签。
+  var aiOffName = '⏸️ 关闭（跟随' + mainName + '）';
+  var aiOffGroup = null;
+  if (!existing[aiOffName]) {
+    aiOffGroup = { name: aiOffName, type: 'select', proxies: [mainName], hidden: true };
+    existing[aiOffName] = true;
+  }
+
+  // AI 独立选择组：地区组 + 其他地区 + 「关闭」旁路 + 全部节点 + DIRECT。
+  // 选「关闭」时 AI 组跟随主入口（雪山·Link）的当前选择，等于临时停用 AI 分流。
+  var aiGroup = null;
+  if (!existing[AI]) {
+    var aiMembers = [];
+    for (var an = 0; an < regionNames.length; an++) {
+      aiMembers.push(regionNames[an]);
+    }
+    if (others.length > 0) aiMembers.push(OTHER);
+    aiMembers.push(aiOffName);
+    aiMembers.push(ALL);
+    aiMembers.push('DIRECT');
+    aiGroup = { name: AI, type: 'select', proxies: aiMembers };
+    existing[AI] = true;
+  }
+
   // 订阅原有分组（自动选择、故障转移等）原样保留，统一排到最后
   var kept = [];
   for (var g3 = 0; g3 < groups.length; g3++) {
@@ -296,6 +356,8 @@ function main(config) {
 
   var built = [mainGroup];
   if (autoGroup) built.push(autoGroup);
+  if (aiOffGroup) built.push(aiOffGroup);
+  if (aiGroup) built.push(aiGroup);
   for (var b2 = 0; b2 < regionGroups.length; b2++) built.push(regionGroups[b2]);
   if (otherGroup) built.push(otherGroup);
   if (allGroup) built.push(allGroup);
