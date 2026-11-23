@@ -92,7 +92,7 @@ function main(config) {
   //    示例默认注释掉，去掉行首的 // 才生效。
   var MY_RULES = [
     // —— 当前在用的 ——
-    // 'DOMAIN-SUFFIX,bing.com,DIRECT',
+    'DOMAIN-SUFFIX,cn.bing.com,DIRECT',
 
     // —— 直连 ——
     // 'DOMAIN-SUFFIX,example.com,DIRECT',
